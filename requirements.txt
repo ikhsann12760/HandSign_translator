@@ -1,6 +1,2 @@
 flask
-opencv-python-headless
-mediapipe
-numpy
-scikit-learn
 gunicorn

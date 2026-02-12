@@ -3,11 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Sign Translation</title>
+    <title>Hand Sign Translation - Browser Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
     <style>
         .video-container {
             transform: scaleX(-1);
+        }
+        #canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+        #video {
+            transform: scaleX(-1);
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -15,30 +31,16 @@
     <div class="max-w-4xl w-full bg-white rounded-xl shadow-2xl overflow-hidden">
         <div class="bg-blue-600 p-6 text-white text-center">
             <h1 class="text-3xl font-bold">Hand Sign Translator</h1>
-            <p class="text-blue-100">Real-time Translation using Computer Vision</p>
+            <p class="text-blue-100">Real-time Browser-based Detection</p>
         </div>
         
         <div class="p-6">
-            <!-- Vercel Camera Note -->
-            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-yellow-700">
-                            <strong>Note:</strong> Untuk hasil terbaik di Vercel, pastikan browser mengizinkan akses kamera. Jika streaming lambat, ini karena batasan serverless.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
             <div class="relative rounded-lg overflow-hidden bg-black aspect-video mb-6">
-                <img src="{{ url_for('video_feed') }}" class="w-full h-full object-contain" alt="Video Feed" onerror="this.src='https://via.placeholder.com/640x480?text=Camera+Stream+Error';">
-                <div id="loading" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white hidden">
-                    <span class="text-xl">Loading camera...</span>
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+                <div id="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                    <span class="text-xl">Initializing AI Models...</span>
                 </div>
             </div>
 
@@ -60,68 +62,187 @@
                 <p class="text-xs text-gray-400 mt-2 italic">*Hold a sign for 1.5 seconds to add it to the sentence.</p>
             </div>
         </div>
-
-        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 text-sm text-gray-500">
-            <p>Tips: Ensure good lighting and keep your hands within the camera frame.</p>
-        </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const loading = document.getElementById("loading");
+        const translationContainer = document.getElementById("translations");
+        const sentenceContainer = document.getElementById("sentence");
+
+        let handLandmarker;
+        let modelData;
         let currentSentence = "";
         let lastChar = "";
         let charStartTime = 0;
-        const HOLD_THRESHOLD = 1500; // ms
+        const HOLD_THRESHOLD = 1500;
 
-        function updateTranslations() {
-            fetch('/translations')
-                .then(response => response.json())
-                .then(data => {
-                    const container = document.getElementById('translations');
-                    const sentenceContainer = document.getElementById('sentence');
+        // Initialize MediaPipe and Model
+        async function init() {
+            try {
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+                );
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 2
+                });
+
+                const response = await fetch('/static/model_data.json');
+                modelData = await response.json();
+                
+                startCamera();
+            } catch (error) {
+                console.error("Init error:", error);
+                alert("Gagal memuat model AI. Pastikan koneksi internet stabil.");
+            }
+        }
+
+        async function startCamera() {
+            const constraints = { video: { width: 1280, height: 720 } };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            video.addEventListener("loadeddata", predictWebcam);
+            loading.classList.add("hidden");
+        }
+
+        let lastVideoTime = -1;
+        async function predictWebcam() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            let startTimeMs = performance.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                const results = handLandmarker.detectForVideo(video, startTimeMs);
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                if (results.landmarks && results.landmarks.length > 0) {
+                    const translations = [];
                     
-                    if (data.length === 0) {
-                        container.innerHTML = '<span class="text-gray-400 italic">Detecting hands...</span>';
-                        lastChar = "";
-                    } else {
-                        container.innerHTML = data.map(t => `
-                            <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold shadow-sm border border-blue-200">
-                                ${t}
-                            </div>
-                        `).join('');
-
-                        // Logic for sentence building (use the first detected hand)
-                        let char = data[0].split(': ')[1];
-                        if (char && char !== "...") {
-                            if (char === lastChar) {
-                                if (Date.now() - charStartTime > HOLD_THRESHOLD) {
-                                    addCharToSentence(char);
-                                    lastChar = ""; // Reset to prevent multiple additions
+                    for (let i = 0; i < results.landmarks.length; i++) {
+                        const landmarks = results.landmarks[i];
+                        const handedness = results.handedness[i][0].categoryName;
+                        
+                        // Draw landmarks
+                        drawLandmarks(ctx, landmarks);
+                        
+                        // Process for prediction
+                        const processed = preProcessLandmarks(landmarks, canvas.width, canvas.height);
+                        const predictionIdx = predictRF(processed);
+                        const label = modelData.labels[predictionIdx];
+                        
+                        translations.push(`${handedness}: ${label}`);
+                        
+                        // Sentence logic
+                        if (i === 0) { // Primary hand
+                            if (label && label !== "...") {
+                                if (label === lastChar) {
+                                    if (Date.now() - charStartTime > HOLD_THRESHOLD) {
+                                        addChar(label);
+                                        lastChar = "";
+                                    }
+                                } else {
+                                    lastChar = label;
+                                    charStartTime = Date.now();
                                 }
-                            } else {
-                                lastChar = char;
-                                charStartTime = Date.now();
                             }
                         }
                     }
-                })
-                .catch(err => console.error('Error fetching translations:', err));
+                    
+                    translationContainer.innerHTML = translations.map(t => `
+                        <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold shadow-sm border border-blue-200">
+                            ${t}
+                        </div>
+                    `).join('');
+                } else {
+                    translationContainer.innerHTML = '<span class="text-gray-400 italic">Detecting hands...</span>';
+                    lastChar = "";
+                }
+            }
+            window.requestAnimationFrame(predictWebcam);
         }
 
-        function addCharToSentence(char) {
-            const sentenceContainer = document.getElementById('sentence');
+        function preProcessLandmarks(landmarks, width, height) {
+            let landmarkList = landmarks.map(l => [l.x * width, l.y * height]);
+            
+            // Convert to relative
+            let baseX = landmarkList[0][0];
+            let baseY = landmarkList[0][1];
+            let relativeList = landmarkList.map(l => [l[0] - baseX, l[1] - baseY]);
+            
+            // Flatten
+            let flattened = [].concat(...relativeList);
+            
+            // Normalize
+            let maxVal = Math.max(...flattened.map(v => Math.abs(v)));
+            return flattened.map(v => v / maxVal);
+        }
+
+        // Simple Random Forest Predictor in JS
+        function predictRF(input) {
+            const forest = modelData.forest;
+            const votes = new Array(modelData.labels.length).fill(0);
+            
+            for (const tree of forest) {
+                let nodeIdx = 0;
+                while (tree.children_left[nodeIdx] !== -1) {
+                    const featureIdx = tree.feature[nodeIdx];
+                    const threshold = tree.threshold[nodeIdx];
+                    if (input[featureIdx] <= threshold) {
+                        nodeIdx = tree.children_left[nodeIdx];
+                    } else {
+                        nodeIdx = tree.children_right[nodeIdx];
+                    }
+                }
+                // Leaf node - find class with max value
+                const values = tree.value[nodeIdx][0];
+                let maxIdx = 0;
+                for (let i = 1; i < values.length; i++) {
+                    if (values[i] > values[maxIdx]) maxIdx = i;
+                }
+                votes[maxIdx]++;
+            }
+            
+            let finalMaxIdx = 0;
+            for (let i = 1; i < votes.length; i++) {
+                if (votes[i] > votes[finalMaxIdx]) finalMaxIdx = i;
+            }
+            return finalMaxIdx;
+        }
+
+        function addChar(char) {
             currentSentence += char;
             sentenceContainer.innerText = currentSentence;
-            
-            // Auto scroll if needed
-            sentenceContainer.scrollTop = sentenceContainer.scrollHeight;
         }
 
-        function clearSentence() {
+        window.clearSentence = () => {
             currentSentence = "";
-            document.getElementById('sentence').innerHTML = '<span class="text-gray-400">Sentence will appear here...</span>';
+            sentenceContainer.innerText = "Sentence will appear here...";
+        };
+
+        function drawLandmarks(ctx, landmarks) {
+            ctx.fillStyle = "#00FF00";
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 2;
+            
+            landmarks.forEach(l => {
+                ctx.beginPath();
+                ctx.arc(l.x * canvas.width, l.y * canvas.height, 4, 0, 2 * Math.PI);
+                ctx.fill();
+            });
         }
 
-        setInterval(updateTranslations, 500);
+        init();
     </script>
 </body>
 </html>
