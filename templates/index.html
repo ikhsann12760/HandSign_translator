@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Sign Translation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .video-container {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="max-w-4xl w-full bg-white rounded-xl shadow-2xl overflow-hidden">
+        <div class="bg-blue-600 p-6 text-white text-center">
+            <h1 class="text-3xl font-bold">Hand Sign Translator</h1>
+            <p class="text-blue-100">Real-time Translation using Computer Vision</p>
+        </div>
+        
+        <div class="p-6">
+            <div class="relative rounded-lg overflow-hidden bg-black aspect-video mb-6">
+                <img src="{{ url_for('video_feed') }}" class="w-full h-full object-contain" alt="Video Feed">
+                <div id="loading" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white hidden">
+                    <span class="text-xl">Loading camera...</span>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 mb-6">
+                <h2 class="text-lg font-semibold text-gray-700 mb-3">Detected Alphabet:</h2>
+                <div id="translations" class="flex flex-wrap gap-3">
+                    <span class="text-gray-400 italic">Detecting hands...</span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg p-6 border border-gray-200 shadow-inner">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold text-gray-700">Composed Sentence:</h2>
+                    <button onclick="clearSentence()" class="text-red-500 hover:text-red-700 text-sm font-medium">Clear All</button>
+                </div>
+                <div id="sentence" class="text-2xl font-mono min-h-[3rem] p-3 bg-gray-50 rounded border border-dashed border-gray-300 break-words">
+                    <span class="text-gray-400">Sentence will appear here...</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-2 italic">*Hold a sign for 1.5 seconds to add it to the sentence.</p>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 text-sm text-gray-500">
+            <p>Tips: Ensure good lighting and keep your hands within the camera frame.</p>
+        </div>
+    </div>
+
+    <script>
+        let currentSentence = "";
+        let lastChar = "";
+        let charStartTime = 0;
+        const HOLD_THRESHOLD = 1500; // ms
+
+        function updateTranslations() {
+            fetch('/translations')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('translations');
+                    const sentenceContainer = document.getElementById('sentence');
+                    
+                    if (data.length === 0) {
+                        container.innerHTML = '<span class="text-gray-400 italic">Detecting hands...</span>';
+                        lastChar = "";
+                    } else {
+                        container.innerHTML = data.map(t => `
+                            <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold shadow-sm border border-blue-200">
+                                ${t}
+                            </div>
+                        `).join('');
+
+                        // Logic for sentence building (use the first detected hand)
+                        let char = data[0].split(': ')[1];
+                        if (char && char !== "...") {
+                            if (char === lastChar) {
+                                if (Date.now() - charStartTime > HOLD_THRESHOLD) {
+                                    addCharToSentence(char);
+                                    lastChar = ""; // Reset to prevent multiple additions
+                                }
+                            } else {
+                                lastChar = char;
+                                charStartTime = Date.now();
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.error('Error fetching translations:', err));
+        }
+
+        function addCharToSentence(char) {
+            const sentenceContainer = document.getElementById('sentence');
+            currentSentence += char;
+            sentenceContainer.innerText = currentSentence;
+            
+            // Auto scroll if needed
+            sentenceContainer.scrollTop = sentenceContainer.scrollHeight;
+        }
+
+        function clearSentence() {
+            currentSentence = "";
+            document.getElementById('sentence').innerHTML = '<span class="text-gray-400">Sentence will appear here...</span>';
+        }
+
+        setInterval(updateTranslations, 500);
+    </script>
+</body>
+</html>

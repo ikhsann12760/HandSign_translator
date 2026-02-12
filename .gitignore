@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+model/keypoint_classifier/keypoint.csv
+model/keypoint_classifier/keypoint_classifier.pkl
+hand_landmarker.task
+dataset_path.txt
+.env
+venv/
+.vscode/
