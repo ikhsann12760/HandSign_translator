@@ -22,11 +22,15 @@ def train_model():
 
     # Train model
     print("Melatih model (Random Forest dengan optimasi)...")
-    # Mengurangi n_estimators dan mengatur min_samples_leaf untuk mencegah overfitting pada data kecil
+    # Random Forest with optimized parameters
     model = RandomForestClassifier(
-        n_estimators=50, 
+        n_estimators=200,      # More trees
+        max_depth=20,          # Deeper trees
+        min_samples_split=2,
         min_samples_leaf=1,
         max_features='sqrt',
+        bootstrap=True,
+        class_weight='balanced', # Handle unbalanced classes
         random_state=42
     )
     model.fit(X_train, y_train)

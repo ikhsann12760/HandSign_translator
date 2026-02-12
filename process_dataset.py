@@ -80,33 +80,33 @@ def process_dataset():
                 
                 image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 
-                # Enhanced Data Augmentation:
+                # Data Augmentation:
                 # 1. Original
-                # 2. Horizontal Flip (Handedness switch)
-                # 3. Small Rotations (-15, 15 degrees)
-                # 4. Brightness variations
+                # 2. Horizontal Flip
+                # 3. Rotations (-15, -10, -5, 5, 10, 15 degrees)
+                # 4. Brightness & Contrast variants
                 
                 for flip_mode in [None, 1]:
                     base_img = image_rgb
                     if flip_mode is not None:
                         base_img = cv2.flip(image_rgb, flip_mode)
                     
-                    # Add original and variations
                     variants = [base_img]
                     
-                    # Rotation variants
+                    # Rotation variants (Lebih banyak sudut)
                     h, w = base_img.shape[:2]
                     center = (w // 2, h // 2)
-                    for angle in [-15, 15]:
+                    for angle in [-15, -10, -5, 5, 10, 15]:
                         M = cv2.getRotationMatrix2D(center, angle, 1.0)
                         rotated = cv2.warpAffine(base_img, M, (w, h))
                         variants.append(rotated)
                     
                     # Brightness variants
-                    brighter = cv2.convertScaleAbs(base_img, alpha=1.2, beta=10)
-                    darker = cv2.convertScaleAbs(base_img, alpha=0.8, beta=-10)
-                    variants.append(brighter)
-                    variants.append(darker)
+                    variants.append(cv2.convertScaleAbs(base_img, alpha=1.3, beta=20)) # Lebih terang
+                    variants.append(cv2.convertScaleAbs(base_img, alpha=0.7, beta=-20)) # Lebih gelap
+                    
+                    # Contrast variants
+                    variants.append(cv2.convertScaleAbs(base_img, alpha=1.5, beta=0)) 
 
                     for img_variant in variants:
                         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_variant)
