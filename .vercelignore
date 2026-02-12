@@ -1,0 +1,13 @@
+dataset/
+process_dataset.py
+train_model.py
+display_dataset.py
+collect_data.py
+download_kaggle.py
+dataset_path.txt
+.git/
+__pycache__/
+*.pyc
+venv/
+.vscode/
+node_modules/
