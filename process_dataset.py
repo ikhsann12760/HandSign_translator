@@ -2,7 +2,34 @@ import cv2
 import csv
 import os
 import mediapipe as mp
-from hand_detector import HandDetector, calc_landmark_list, pre_process_landmark
+import copy
+import itertools
+from hand_detector import HandDetector, calc_landmark_list
+
+def pre_process_landmark(landmark_list):
+    temp_landmark_list = copy.deepcopy(landmark_list)
+
+    # Convert to relative coordinates
+    base_x, base_y = temp_landmark_list[0][0], temp_landmark_list[0][1]
+    for index, landmark_point in enumerate(temp_landmark_list):
+        temp_landmark_list[index][0] = temp_landmark_list[index][0] - base_x
+        temp_landmark_list[index][1] = temp_landmark_list[index][1] - base_y
+
+    # Convert to a one-dimensional list
+    temp_landmark_list = list(
+        itertools.chain.from_iterable(temp_landmark_list))
+
+    # Normalization (MENGGUNAKAN LOGIC YANG SAMA DENGAN JAVASCRIPT)
+    # Cari nilai absolut maksimum untuk normalisasi
+    max_value = 0
+    for v in temp_landmark_list:
+        if abs(v) > max_value:
+            max_value = abs(v)
+    
+    if max_value == 0:
+        return temp_landmark_list
+
+    return [v / max_value for v in temp_landmark_list]
 
 def process_dataset():
     # Folder dataset lokal
