@@ -131,29 +131,36 @@
                     
                     for (let i = 0; i < results.landmarks.length; i++) {
                         const landmarks = results.landmarks[i];
-                        const handedness = results.handedness[i][0].categoryName;
+                        
+                        // Safety check for handedness
+                        let handedness = "Unknown";
+                        if (results.handedness && results.handedness[i] && results.handedness[i][0]) {
+                            handedness = results.handedness[i][0].categoryName;
+                        }
                         
                         // Draw landmarks
                         drawLandmarks(ctx, landmarks);
                         
-                        // Process for prediction
-                        const processed = preProcessLandmarks(landmarks, canvas.width, canvas.height);
-                        const predictionIdx = predictRF(processed);
-                        const label = modelData.labels[predictionIdx];
-                        
-                        translations.push(`${handedness}: ${label}`);
-                        
-                        // Sentence logic
-                        if (i === 0) { // Primary hand
-                            if (label && label !== "...") {
-                                if (label === lastChar) {
-                                    if (Date.now() - charStartTime > HOLD_THRESHOLD) {
-                                        addChar(label);
-                                        lastChar = "";
+                        // Process for prediction (hanya jika model sudah siap)
+                        if (modelData && modelData.labels) {
+                            const processed = preProcessLandmarks(landmarks, canvas.width, canvas.height);
+                            const predictionIdx = predictRF(processed);
+                            const label = modelData.labels[predictionIdx];
+                            
+                            translations.push(`${handedness}: ${label}`);
+                            
+                            // Sentence logic
+                            if (i === 0) { // Primary hand
+                                if (label && label !== "...") {
+                                    if (label === lastChar) {
+                                        if (Date.now() - charStartTime > HOLD_THRESHOLD) {
+                                            addChar(label);
+                                            lastChar = "";
+                                        }
+                                    } else {
+                                        lastChar = label;
+                                        charStartTime = Date.now();
                                     }
-                                } else {
-                                    lastChar = label;
-                                    charStartTime = Date.now();
                                 }
                             }
                         }
