@@ -59,7 +59,10 @@
                 <div id="sentence" class="text-2xl font-mono min-h-[3rem] p-3 bg-gray-50 rounded border border-dashed border-gray-300 break-words">
                     <span class="text-gray-400">Sentence will appear here...</span>
                 </div>
-                <p class="text-xs text-gray-400 mt-2 italic">*Hold a sign for 1.5 seconds to add it to the sentence.</p>
+                <div class="flex flex-col gap-1 mt-2">
+                    <p class="text-xs text-gray-400 italic">*Tahan posisi tangan selama 1.5 detik untuk memasukkan huruf.</p>
+                    <p class="text-xs text-blue-500 italic font-medium">*Turunkan tangan selama 2 detik untuk memberikan spasi otomatis.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -79,7 +82,9 @@
         let currentSentence = "";
         let lastChar = "";
         let charStartTime = 0;
+        let lastHandSeenTime = Date.now();
         const HOLD_THRESHOLD = 1500;
+        const SPACE_TIMEOUT = 2000; // 2 detik tanpa tangan = spasi
 
         // Initialize MediaPipe and Model
         async function init() {
@@ -127,6 +132,7 @@
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 if (results.landmarks && results.landmarks.length > 0) {
+                    lastHandSeenTime = Date.now(); // Reset timer spasi karena tangan terdeteksi
                     const translations = [];
                     
                     for (let i = 0; i < results.landmarks.length; i++) {
@@ -174,6 +180,13 @@
                 } else {
                     translationContainer.innerHTML = '<span class="text-gray-400 italic">Detecting hands...</span>';
                     lastChar = "";
+
+                    // Logika Spasi Otomatis: Jika tidak ada tangan selama 2 detik
+                    if (currentSentence.length > 0 && !currentSentence.endsWith(" ")) {
+                        if (Date.now() - lastHandSeenTime > SPACE_TIMEOUT) {
+                            addChar(" ");
+                        }
+                    }
                 }
             }
             window.requestAnimationFrame(predictWebcam);
