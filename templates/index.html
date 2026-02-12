@@ -173,18 +173,28 @@
         }
 
         function preProcessLandmarks(landmarks, width, height) {
+            // Kita butuh koordinat piksel untuk konsistensi dengan logic training sebelumnya
             let landmarkList = landmarks.map(l => [l.x * width, l.y * height]);
             
-            // Convert to relative
+            // Convert to relative (terhadap wrist/pergelangan tangan - index 0)
             let baseX = landmarkList[0][0];
             let baseY = landmarkList[0][1];
             let relativeList = landmarkList.map(l => [l[0] - baseX, l[1] - baseY]);
             
             // Flatten
-            let flattened = [].concat(...relativeList);
+            let flattened = [];
+            relativeList.forEach(l => {
+                flattened.push(l[0]);
+                flattened.push(l[1]);
+            });
             
-            // Normalize
-            let maxVal = Math.max(...flattened.map(v => Math.abs(v)));
+            // Normalize (dengan nilai absolut maksimum)
+            let maxVal = 0;
+            flattened.forEach(v => {
+                if (Math.abs(v) > maxVal) maxVal = Math.abs(v);
+            });
+            
+            if (maxVal === 0) return flattened;
             return flattened.map(v => v / maxVal);
         }
 
@@ -235,6 +245,22 @@
             ctx.strokeStyle = "#FFFFFF";
             ctx.lineWidth = 2;
             
+            // Draw Connections (Simplified)
+            const connections = [
+                [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
+                [0, 5], [5, 6], [6, 7], [7, 8], // Index
+                [5, 9], [9, 10], [10, 11], [11, 12], // Middle
+                [9, 13], [13, 14], [14, 15], [15, 16], // Ring
+                [13, 17], [0, 17], [17, 18], [18, 19], [19, 20] // Pinky
+            ];
+
+            connections.forEach(([i, j]) => {
+                ctx.beginPath();
+                ctx.moveTo(landmarks[i].x * canvas.width, landmarks[i].y * canvas.height);
+                ctx.lineTo(landmarks[j].x * canvas.width, landmarks[j].y * canvas.height);
+                ctx.stroke();
+            });
+
             landmarks.forEach(l => {
                 ctx.beginPath();
                 ctx.arc(l.x * canvas.width, l.y * canvas.height, 4, 0, 2 * Math.PI);
