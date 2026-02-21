@@ -36,3 +36,9 @@ Aplikasi ini menggunakan teknologi Computer Vision untuk mendeteksi titik koordi
 ---
 *Dikembangkan sebagai solusi komunikasi inklusif berbasis Computer Vision.*
 *Status dari project yang sedang di kerjakan adalah Ongoing dan masih dalam tahap pengembangan.*
+
+### Contoh hasil deteksi
+
+Berikut contoh hasil deteksi plat nomor yang dihasilkan model:
+
+![Contoh hasil deteksi](Example_pictures/Example.png)
