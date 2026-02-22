@@ -48,4 +48,4 @@ Berikut contoh hasil deteksi plat nomor yang dihasilkan model:
 
 Berikut Adalah Dataset Yang di gunakan Sebagai Contoh Model:
 
-![DataSetyangdigunakan] (example_SIBI_BISINDO\HandSign)
+![Dataset](Example_SIBI_BISINDO/HandSign.jpg)
