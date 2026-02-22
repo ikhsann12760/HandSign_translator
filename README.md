@@ -42,3 +42,10 @@ Aplikasi ini menggunakan teknologi Computer Vision untuk mendeteksi titik koordi
 Berikut contoh hasil deteksi plat nomor yang dihasilkan model:
 
 ![Contoh hasil deteksi](Example_pictures/Example.png)
+
+
+### DataSet Yang di Ambil Sebagai Model
+
+Berikut Adalah Dataset Yang di gunakan Sebagai Contoh Model:
+
+![DataSetyangdigunakan] (example_SIBI_BISINDO\HandSign)
